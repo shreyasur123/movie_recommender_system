@@ -1,14 +1,30 @@
 import streamlit as st
 import pandas as pd
 import requests
+import gdown
+import pickle
+import os
 
 TMDB_API = "3db83fa7c4e6f2ff29e56e620e05f4d3"
 
 
-# headers = {
-#     "accept": "application/json",
-#     "Authorization": "Bearer 3db83fa7c4e6f2ff29e56e620e05f4d3"
-# }
+@st.cache_resource
+def load_similarity():
+    # ID of your file from Google Drive link
+    file_id = '1ISsG7BM5M6jr6ZtbEI0fYsF4LBe_-6X7'
+
+    # Destination path
+    output = 'similarity.pkl'
+
+    # Download the file if it doesn't exist
+    if not os.path.exists(output):
+        gdown.download(f'https://drive.google.com/uc?id={file_id}', output, quiet=False)
+
+    # Load the similarity matrix
+    with open(output, 'rb') as f:
+        similarity = pickle.load(f)
+
+    return similarity
 
 
 def fetch_poster(movie_id):
@@ -19,11 +35,8 @@ def fetch_poster(movie_id):
     response = requests.get(f"https://api.themoviedb.org/3/movie/{movie_id}?", params=params)
     fetched_poster_path = response.json()["poster_path"]
     complete_poster_path = "https://image.tmdb.org/t/p/original" + fetched_poster_path
-    # print(complete_poster_path)
     return complete_poster_path
 
-
-# print(fetch_poster('19995'))
 
 def recommend(movie):
     movie_index = movies[movies['title'] == movie].index[0]
@@ -35,16 +48,18 @@ def recommend(movie):
     for i in sorted_list:
         movie_id = movies.iloc[i[0]].movie_id
         recommended_movies.append(movies.iloc[i[0]].title)
-        # fetch poster from id
         recommended_movies_posters.append(fetch_poster(movie_id))
 
     return recommended_movies, recommended_movies_posters
 
 
+# Load movies dataframe
 movies = pd.read_pickle('movies.pkl')
 movies_list = movies['title'].values
 
-similarity = pd.read_pickle('similarity.pkl')
+# Load similarity matrix
+similarity = load_similarity()
+
 st.title('Movie Recommender System')
 
 selected_movie_name = st.selectbox(
@@ -55,22 +70,7 @@ if st.button("Recommend"):
     names, posters = recommend(selected_movie_name)
     col1, col2, col3, col4, col5 = st.columns(5, gap="medium")
 
-    with col1:
-        st.text(names[0])
-        st.image(posters[0])
-
-    with col2:
-        st.text((names[1]))
-        st.image(posters[1])
-
-    with col3:
-        st.text((names[2]))
-        st.image(posters[2])
-
-    with col4:
-        st.text((names[3]))
-        st.image(posters[3])
-
-    with col5:
-        st.text((names[4]))
-        st.image(posters[4])
+    for col, name, poster in zip([col1, col2, col3, col4, col5], names, posters):
+        with col:
+            st.text(name)
+            st.image(poster)
